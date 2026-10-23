@@ -1,0 +1,42 @@
+name: Release
+
+# Пушим тег v1.2.3 -> собирается PrintAgent.exe и выкладывается в GitHub Release.
+# Программы на ПК раз в час смотрят «последний релиз» и обновляются сами.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Write version from tag
+        shell: bash
+        run: echo "__version__ = \"${GITHUB_REF_NAME#v}\"" > agent/version.py
+
+      - name: Build exe
+        run: pyinstaller --onefile --noconsole --name PrintAgent --hidden-import pystray._win32 main.py
+
+      - name: Checksum
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash dist/PrintAgent.exe -Algorithm SHA256).Hash.ToLower()
+          "$hash  PrintAgent.exe" | Out-File -Encoding ascii -NoNewline dist/PrintAgent.exe.sha256
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/PrintAgent.exe
+            dist/PrintAgent.exe.sha256
