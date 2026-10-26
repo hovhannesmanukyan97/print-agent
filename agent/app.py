@@ -9,8 +9,10 @@ from pathlib import Path
 import pystray
 from PIL import Image, ImageDraw
 
-from . import autostart, config, updater, winutil
+from . import autostart, config, settings_window, updater, winutil
+from .state import status
 from .version import __version__
+from .worker import Worker
 
 log = logging.getLogger("agent")
 
@@ -87,8 +89,20 @@ def run_tray():
         stop_event.set()
         icon.stop()
 
+    def notify(text):
+        try:
+            icon.notify(text, "Print Agent")
+        except Exception:
+            log.exception("Уведомление")
+
+    worker = Worker(stop_event, notify, on_connected=lambda: settings_window.open_window(worker))
+
     icon.menu = pystray.Menu(
         pystray.MenuItem(f"Print Agent {__version__}", None, enabled=False),
+        pystray.MenuItem(lambda item: status.line(), None, enabled=False),
+        pystray.Menu.SEPARATOR,
+        pystray.MenuItem("Настройки", lambda icon_, item: settings_window.open_window(worker), default=True),
+        pystray.MenuItem("Привязать браузер", lambda icon_, item: threading.Thread(target=worker.bind_browser, daemon=True).start()),
         pystray.MenuItem("Проверить обновления", check_updates),
         pystray.MenuItem("Запускать при включении компьютера", toggle_autostart,
                          checked=lambda item: autostart.is_enabled()),
@@ -102,6 +116,13 @@ def run_tray():
         if "--after-update" in sys.argv:
             icon_.notify(f"Работает версия {__version__}", "Print Agent")
         updater.start_background_loop(on_restart, stop_event)
+        worker.start()
+
+        # строка статуса в меню: pystray на Windows пересобирает меню только по update_menu()
+        def refresh_menu():
+            while not stop_event.wait(3):
+                icon_.update_menu()
+        threading.Thread(target=refresh_menu, name="menu", daemon=True).start()
 
     icon.run(setup=on_ready)
 

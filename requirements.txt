@@ -1,3 +1,5 @@
 pystray==0.19.5
 Pillow==11.0.0
+pywin32==308
+pypdfium2==4.30.0
 pyinstaller==6.11.1

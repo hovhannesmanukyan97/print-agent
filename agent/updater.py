@@ -9,6 +9,7 @@ import urllib.request
 from pathlib import Path
 
 from . import config, winutil
+from .state import print_lock
 from .version import __version__
 
 log = logging.getLogger(__name__)
@@ -85,12 +86,15 @@ def check_and_update(on_restart):
         old = exe.with_name(config.EXE_NAME + ".old")
         new.write_bytes(content)
         old.unlink(missing_ok=True)
+        # ждём, пока допечатается текущее задание, и больше не отпускаем - дальше только перезапуск
+        print_lock.acquire()
         # запущенный exe нельзя перезаписать, но можно переименовать
         os.replace(exe, old)
         try:
             os.replace(new, exe)
         except OSError:
             os.replace(old, exe)  # вернуть как было
+            print_lock.release()
             raise
 
         log.info("Перезапуск в версию %s", release["version"])
