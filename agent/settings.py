@@ -27,7 +27,8 @@ def _unprotect(text):
 def load():
     with _lock:
         try:
-            raw = json.loads(config.SETTINGS_FILE.read_text(encoding="utf-8"))
+            # utf-8-sig: файл, поправленный руками в Блокноте, может начинаться с BOM
+            raw = json.loads(config.SETTINGS_FILE.read_text(encoding="utf-8-sig"))
         except FileNotFoundError:
             raw = {}
         except Exception:

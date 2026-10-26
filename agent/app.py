@@ -3,6 +3,7 @@ import os
 import shutil
 import sys
 import threading
+import tkinter as tk
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
@@ -88,6 +89,7 @@ def run_tray():
     def quit_app(icon_, item):
         stop_event.set()
         icon.stop()
+        settings_window.call(root.quit)
 
     def notify(text):
         try:
@@ -124,7 +126,13 @@ def run_tray():
                 icon_.update_menu()
         threading.Thread(target=refresh_menu, name="menu", daemon=True).start()
 
-    icon.run(setup=on_ready)
+    # tkinter работает только из главного потока (иначе падает при закрытии окна),
+    # поэтому главный поток держит скрытое окно Tk, а значок в трее живёт в своём потоке
+    root = tk.Tk()
+    root.withdraw()
+    settings_window.init(root)
+    icon.run_detached(setup=on_ready)
+    root.mainloop()
 
 
 def main():
